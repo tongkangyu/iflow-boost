@@ -1,0 +1,8 @@
+{
+    "name": "skillify",
+    "description": "将当前操作转化为可复用的 Skill。当用户反复执行相同操作时，自动创建 Skill 文件。",
+    "usage": "告诉 iflow：把这个做成 skill / skillify",
+    "trigger_keywords": ["做成skill", "skillify", "保存操作", "复用", "模板化"],
+    "instructions": "创建 Skill 步骤：1) 分析当前操作的步骤 2) 提取可参数化的部分 3) 编写 Skill JSON 文件（name, description, trigger_keywords, instructions, category）4) 保存到 ~/.iflow/skills/ 目录 5) 确认 Skill 已创建并可用",
+    "category": "meta"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "remember",
+    "description": "记住重要信息到项目记忆文件，跨会话持久化。当用户说'记住'、'记录'、'别忘了'时触发。",
+    "usage": "告诉 iflow：记住 XXX",
+    "trigger_keywords": ["记住", "记录", "别忘了", "remember", "note this", "keep in mind"],
+    "instructions": "当用户要求记住某些内容时，将信息追加到项目根目录的 .iflow/memory.md 文件中，格式为 '- [日期] 内容'。然后确认已记住。",
+    "category": "memory"
+}

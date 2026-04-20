@@ -1,0 +1,8 @@
+{
+    "name": "debug",
+    "description": "系统化调试辅助。当遇到错误或异常时，提供结构化的调试流程。",
+    "usage": "告诉 iflow：帮我调试 / debug",
+    "trigger_keywords": ["调试", "debug", "报错", "错误", "异常", "error", "exception", "bug"],
+    "instructions": "调试流程：1) 复现：确认错误信息和触发条件 2) 定位：找到出错的代码行 3) 分析：理解为什么会出错 4) 假设：列出可能的原因 5) 验证：逐个验证假设 6) 修复：实施修复 7) 确认：验证修复有效且无副作用",
+    "category": "development"
+}

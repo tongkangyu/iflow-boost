@@ -1,0 +1,8 @@
+{
+    "name": "simplify",
+    "description": "简化输出，减少冗余信息。当用户觉得回答太长或太复杂时触发。",
+    "usage": "告诉 iflow：简化 / simplify / 简短点",
+    "trigger_keywords": ["简化", "simplify", "简短", "太长", "太复杂", "精简", "tl;dr"],
+    "instructions": "简化策略：1) 只保留关键结论 2) 用列表替代段落 3) 移除解释性文字 4) 代码只保留核心逻辑 5) 每个要点不超过一行。如果用户再次要求简化，只输出是/否或数字。",
+    "category": "output"
+}

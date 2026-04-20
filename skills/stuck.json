@@ -1,0 +1,8 @@
+{
+    "name": "stuck",
+    "description": "当 AI 卡住或陷入循环时提供恢复策略。当重复相同操作3次以上或无法推进时触发。",
+    "usage": "告诉 iflow：我卡住了 / stuck",
+    "trigger_keywords": ["卡住", "stuck", "循环", "重复", "无法继续", "不知道怎么办"],
+    "instructions": "当检测到卡住时：1) 停止当前方向 2) 回顾目标 3) 列出3个替代方案 4) 询问用户选择哪个方向。避免重复相同的失败操作。",
+    "category": "recovery"
+}
