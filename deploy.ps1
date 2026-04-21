@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 iflow-compressor v3 部署脚本 - 纯 PowerShell，无需 Python
 

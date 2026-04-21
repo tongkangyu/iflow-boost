@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 iflow.js countTokens 补丁脚本 - 使第三方API也能触发自动压缩
 

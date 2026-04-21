@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 卸载 iflow-compressor 补丁，恢复 iflow 原始状态
 
@@ -166,6 +166,12 @@ $logDir = "$env:USERPROFILE\.iflow\logs"
 if (Test-Path $logDir) {
     Remove-Item $logDir -Recurse -Force -ErrorAction SilentlyContinue
     Write-OK "Removed logs directory"
+}
+
+$tmpDir = "$env:USERPROFILE\.iflow\tmp"
+if (Test-Path $tmpDir) {
+    Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+    Write-OK "Removed tmp directory"
 }
 
 Write-Host ""

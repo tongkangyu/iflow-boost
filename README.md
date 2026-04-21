@@ -100,6 +100,25 @@ cd iflow-boost
 # "baseUrl": "http://127.0.0.1:8899/v1"
 ```
 
+### 后台运行与开机自启
+
+```powershell
+# 后台启动（无窗口）
+.\start-proxy.ps1
+
+# 停止后台代理
+.\stop-proxy.ps1
+
+# 查看代理状态
+.\status-proxy.ps1
+
+# 配置开机自启
+.\autostart.ps1
+
+# 移除开机自启
+.\autostart.ps1 -Remove
+```
+
 ## 配置说明
 
 ### 压缩配置
@@ -244,6 +263,11 @@ iflow-boost/
 ├── deploy.ps1                   # 部署代理 + skills + hooks
 ├── uninstall.ps1                # 卸载所有修改
 ├── proxy.ps1                    # 增强代理服务器（纯 PowerShell）
+├── start-proxy.ps1              # 后台启动代理（无窗口）
+├── stop-proxy.ps1               # 停止后台代理
+├── status-proxy.ps1             # 查看代理状态
+├── autostart.ps1                # 配置/移除开机自启
+├── setup-urlacl.ps1             # 配置 HTTP.sys URL ACL（需管理员权限）
 ├── skills/                      # 内置 Skills
 │   ├── remember.json
 │   ├── stuck.json
@@ -267,6 +291,34 @@ iflow-boost/
 - Hooks 按文件名排序执行，`01-` 前缀控制优先级
 - Skills 通过注入 system prompt 生效，不修改 iflow 本身
 - 纯 PowerShell 实现，无需安装 Python 或其他运行时
+
+## 故障排除
+
+### 端口被占用
+
+如果启动 proxy 时提示端口被占用：
+
+```powershell
+# 检查端口占用
+netstat -ano | Select-String ":8899"
+
+# 如果被 System 进程 (PID 4) 占用，需要以管理员身份运行：
+.\setup-urlacl.ps1
+
+# 或者使用其他端口
+.\start-proxy.ps1 -Port 9000
+```
+
+### JSON 解析错误
+
+如果 settings.json 报 BOM 错误：
+
+```powershell
+# 移除 BOM
+$content = Get-Content "$env:USERPROFILE\.iflow\settings.json" -Raw
+$content = $content -replace '^\xEF\xBB\xBF', ''
+[System.IO.File]::WriteAllText("$env:USERPROFILE\.iflow\settings.json", $content, [System.Text.UTF8Encoding]::new($false))
+```
 
 ## 免责声明
 

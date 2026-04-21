@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 iflow-compressor v3: iFlow 增强代理 (纯 PowerShell)
 
@@ -51,7 +51,7 @@ $MAX_INSTRUCTION_SIZE = 4000
 $MAX_TOTAL_INSTRUCTIONS = 12000
 
 # --- PID & Heartbeat ---
-$PID_FILE | Set-Content $PID.ToString()
+$PID | Set-Content $PID_FILE
 
 $heartbeatStop = $false
 Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { $script:heartbeatStop = $true } -SupportEvent
@@ -185,16 +185,19 @@ function Invoke-Hooks($event, $toolName, $toolInput, $toolOutput, $isError) {
         $env:HOOK_TOOL_OUTPUT = if ($toolOutput -is [string]) { $toolOutput } else { $toolOutput | ConvertTo-Json -Compress }
 
         try {
+            $hookTempDir = Join-Path $IFLOW_DIR "tmp"
+            if (-not (Test-Path $hookTempDir)) {
+                New-Item -ItemType Directory -Force -Path $hookTempDir | Out-Null
+            }
+            $hookInputFile = Join-Path $hookTempDir "hook_input_$PID.json"
+
+            $payload | Set-Content $hookInputFile -Encoding UTF8
+
             $proc = Start-Process -FilePath "powershell" `
                 -ArgumentList "-ExecutionPolicy", "Bypass", "-NoProfile", "-File", $script.FullName `
-                -RedirectStandardInput "$env:TEMP\hook_input_$PID.json" `
+                -RedirectStandardInput $hookInputFile `
                 -NoNewWindow -Wait -PassThru
-            
-            $payload | Set-Content "$env:TEMP\hook_input_$PID.json" -Encoding UTF8
-            $proc = Start-Process -FilePath "powershell" `
-                -ArgumentList "-ExecutionPolicy", "Bypass", "-NoProfile", "-File", $script.FullName `
-                -NoNewWindow -Wait -PassThru
-            
+
             if ($proc.ExitCode -eq 2) {
                 return @{ action = "deny"; message = "Blocked by hook $($script.Name)" }
             }
@@ -466,6 +469,8 @@ $listener = [System.Net.HttpListener]::new()
 $listener.Prefixes.Add("http://127.0.0.1:${PORT}/")
 $listener.Start()
 
+$stopRequested = $false
+
 Write-Host "[proxy] 127.0.0.1:${PORT} -> $baseUrl" -ForegroundColor Green
 Write-Host "[proxy] compress model: $COMPRESS_MODEL" -ForegroundColor Green
 Write-Host "[proxy] compress threshold: $COMPRESS_AT tokens" -ForegroundColor Green
@@ -484,7 +489,21 @@ try {
             Get-Date -Format "o" | Set-Content $HEARTBEAT_FILE
         } catch {}
 
-        $context = $listener.GetContext()
+        $asyncResult = $listener.BeginGetContext($null, $null)
+        $waitHandle = $asyncResult.AsyncWaitHandle
+        
+        while (-not $asyncResult.IsCompleted) {
+            if ($waitHandle.WaitOne(500)) { break }
+        }
+        
+        if (-not $listener.IsListening) { break }
+        
+        try {
+            $context = $listener.EndGetContext($asyncResult)
+        } catch {
+            continue
+        }
+        
         $request = $context.Request
         $response = $context.Response
 
@@ -647,8 +666,8 @@ try {
         }
     }
 } finally {
-    $listener.Stop()
-    $listener.Close()
+    try { $listener.Stop() } catch {}
+    try { $listener.Close() } catch {}
     Remove-Item $PID_FILE -Force -ErrorAction SilentlyContinue
     Remove-Item $HEARTBEAT_FILE -Force -ErrorAction SilentlyContinue
     Write-Host "[proxy] stopped" -ForegroundColor Yellow
