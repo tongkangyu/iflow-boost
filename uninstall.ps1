@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 卸载 iflow-boost，恢复 iflow 原始状态
 
@@ -66,7 +66,7 @@ if (Test-Path $settingsPath) {
 
 # --- 3. 清理 Hooks ---
 $hooksDir = Join-Path $IFLOW_DIR "hooks"
-$hookFiles = @("git-context.ps1", "skills-inject.ps1", "cost-tracker.ps1")
+$hookFiles = @("git-context.ps1", "skills-inject.ps1", "cost-tracker.ps1", "compress-summary.ps1")
 
 foreach ($file in $hookFiles) {
     $path = Join-Path $hooksDir $file

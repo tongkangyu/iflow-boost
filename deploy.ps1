@@ -77,6 +77,18 @@ $hooksConfig = @"
       ]
     }
   ],
+  "SessionStart": [
+    {
+      "matcher": "compress",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "powershell -ExecutionPolicy Bypass -File ~/.iflow/hooks/compress-summary.ps1",
+          "timeout": 10
+        }
+      ]
+    }
+  ],
   "PostToolUse": [
     {
       "matcher": "*",
