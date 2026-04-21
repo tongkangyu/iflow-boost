@@ -15,16 +15,88 @@ iFlow CLI 增强工具包 - 无代理版，直接使用 iflow 原生功能。
 ## 快速开始
 
 ```powershell
-# 1. 部署
+# 1. 克隆或下载项目
+git clone https://github.com/your-repo/iflow-boost.git
+cd iflow-boost
+
+# 2. 运行部署脚本
 .\deploy.ps1
 
-# 2. 按提示配置 settings.json
-
-# 3. 直接使用 iflow
+# 3. 完成！直接使用 iflow
 iflow
 ```
 
 就这么简单！无需启动代理，无需占用端口。
+
+## 权限要求
+
+部署脚本需要以下目录的写入权限：
+
+| 路径 | 用途 |
+|------|------|
+| `%APPDATA%\npm\node_modules\@iflow-ai\iflow-cli\bundle\` | 修补 iflow.js |
+| `%USERPROFILE%\.iflow\` | 部署 hooks、skills，更新 settings.json |
+
+**Windows 用户：**
+- 修补 iflow.js 需要**以管理员身份运行 PowerShell**
+- ~/.iflow/ 目录通常不需要特殊权限（用户目录）
+
+**如果没有管理员权限：**
+- 脚本会自动检测权限问题并输出手动步骤
+- 按照打印的指令手动完成配置即可
+
+## 详细使用
+
+### 步骤 1：部署
+
+在 PowerShell 中运行部署脚本：
+
+```powershell
+.\deploy.ps1
+```
+
+脚本会自动：
+1. 应用 countTokens 补丁到 iflow.js
+2. 创建 `~/.iflow/hooks/` 和 `~/.iflow/skills/` 目录
+3. 复制 hook 脚本到 `~/.iflow/hooks/`
+4. 复制 skill JSON 文件到 `~/.iflow/skills/`
+5. 更新 `~/.iflow/settings.json` 配置
+
+### 步骤 2：验证配置
+
+检查 `~/.iflow/settings.json`：
+
+```powershell
+cat ~/.iflow/settings.json
+```
+
+确保包含：
+- `tokensLimit`：模型的上下文限制
+- `compressionTokenThreshold`：0.8（在 80% 限制时压缩）
+- `hooks`：Hook 配置
+
+### 步骤 3：使用 iflow
+
+直接正常使用 iflow：
+
+```powershell
+iflow
+```
+
+当上下文超过阈值时，会自动触发压缩。
+
+### 步骤 4：卸载（可选）
+
+恢复 iflow 原始状态：
+
+```powershell
+.\uninstall.ps1
+```
+
+这会：
+1. 从备份还原 iflow.js
+2. 移除 settings.json 中添加的配置
+3. 清理 hook 脚本和 skill 文件
 
 ## 工作原理
 
@@ -89,19 +161,20 @@ countTokens() {
 // 补丁后的 countTokens 方法
 countTokens() {
   let text = this.extractTextFromRequest(this.currentRequest);
+  let tokens = Math.ceil(text.length / 4);
   
   // 如果 extractTextFromRequest 返回空，尝试从 contents 提取
-  if (!text && this.currentRequest?.contents) {
+  if (tokens === 0 && this.currentRequest?.contents) {
     for (const content of this.currentRequest.contents) {
       if (content.parts) {
         for (const part of content.parts) {
-          if (part.text) text += part.text + ' ';
+          if (part.text) tokens += Math.ceil(part.text.length / 4);
         }
       }
     }
   }
   
-  return this.estimateTokens(text);
+  return { totalTokens: tokens || 1 };
 }
 ```
 
@@ -181,7 +254,7 @@ iflow-boost/
 
 ## 配置
 
-部署后需要在 `~/.iflow/settings.json` 中添加以下配置：
+部署后 `~/.iflow/settings.json` 会被配置：
 
 ```json
 {
@@ -189,46 +262,9 @@ iflow-boost/
   "compressionTokenThreshold": 0.8,
   "contextFileName": ["IFLOW.md", "CLAUDE.md"],
   "hooks": {
-    "SetUpEnvironment": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -ExecutionPolicy Bypass -File ~/.iflow/hooks/git-context.ps1",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "powershell -ExecutionPolicy Bypass -File ~/.iflow/hooks/skills-inject.ps1",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "matcher": "compress",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -ExecutionPolicy Bypass -File ~/.iflow/hooks/compress-summary.ps1",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -ExecutionPolicy Bypass -File ~/.iflow/hooks/cost-tracker.ps1",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
+    "SetUpEnvironment": [...],
+    "SessionStart": [...],
+    "PostToolUse": [...]
   }
 }
 ```
@@ -238,7 +274,7 @@ iflow-boost/
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
 | `tokensLimit` | 上下文 token 上限，超过此值触发压缩 | 256000 |
-| `compressionTokenThreshold` | 压缩阈值比例，当 token 数超过 `tokensLimit * compressionTokenThreshold` 时触发压缩 | 0.8 |
+| `compressionTokenThreshold` | 压缩阈值比例，当 token 数超过 `tokensLimit * ratio` 时触发压缩 | 0.8 |
 
 ### 常用模型的 tokensLimit 参考
 
@@ -250,11 +286,27 @@ iflow-boost/
 | claude-3.5-sonnet (Anthropic) | 200000 |
 | qwen-max | 128000 |
 
-## 卸载
+## 故障排除
 
-```powershell
-.\uninstall.ps1
-```
+### 补丁失败
+
+如果提示 "Could not find exact match"：
+
+1. iflow 可能已更新
+2. 检查 iflow.js 中是否存在 countTokens 方法
+3. 可能需要手动修补
+
+### 压缩未触发
+
+1. 检查补丁是否应用：`.\deploy.ps1` 应显示 "[OK] Patch already applied!"
+2. 检查 settings.json 中的 `tokensLimit` 是否匹配你的模型
+3. 检查 `compressionTokenThreshold` 是否设置（默认 0.8）
+
+### Hooks 不工作
+
+1. 检查 hook 文件是否存在于 `~/.iflow/hooks/`
+2. 检查 settings.json 中的 hooks 配置
+3. 检查 PowerShell 执行策略：`Get-ExecutionPolicy`
 
 ## 注意事项
 

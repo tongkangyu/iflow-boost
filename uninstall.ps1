@@ -1,27 +1,31 @@
-<#
+﻿<#
 .SYNOPSIS
-卸载 iflow-boost，恢复 iflow 原始状态
+Uninstall iflow-boost and restore iflow to original state
 
 .DESCRIPTION
-1. 还原 iflow.js 中的 countTokens 方法
-2. 移除 settings.json 中添加的配置
-3. 清理 Hooks 和 Skills 文件
+1. Restore countTokens method in iflow.js
+2. Remove configuration from settings.json
+3. Clean up Hooks and Skills files
 #>
 
 $ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 $IFLOW_DIR = Join-Path $env:USERPROFILE ".iflow"
 
 function Write-OK { Write-Host "[OK] $args" -ForegroundColor Green }
 function Write-Info { Write-Host "[..] $args" -ForegroundColor Cyan }
 function Write-Warn { Write-Host "[!!] $args" -ForegroundColor Yellow }
+function Write-Step { Write-Host "`n==> $args" -ForegroundColor Yellow }
 
 Write-Host ""
-Write-Host "======================================" -ForegroundColor Yellow
-Write-Host "  卸载 iflow-boost" -ForegroundColor Yellow
-Write-Host "======================================" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+Write-Host "  Uninstall iflow-boost" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
 Write-Host ""
 
-# --- 1. 还原 iflow.js ---
+# --- 1. Restore iflow.js ---
+Write-Step "Restoring iflow.js..."
 $iflowJs = "$env:APPDATA\npm\node_modules\@iflow-ai\iflow-cli\bundle\iflow.js"
 $backup = $iflowJs + ".bak"
 
@@ -33,11 +37,11 @@ if (Test-Path $backup) {
     Write-Warn "No backup found, iflow.js not restored"
 }
 
-# --- 2. 清理 settings.json ---
+# --- 2. Clean settings.json ---
+Write-Step "Cleaning settings.json..."
 $settingsPath = Join-Path $IFLOW_DIR "settings.json"
 
 if (Test-Path $settingsPath) {
-    Write-Info "Cleaning settings.json..."
     $settings = Get-Content $settingsPath -Raw | ConvertFrom-Json
     
     $propsToRemove = @(
@@ -61,10 +65,13 @@ if (Test-Path $settingsPath) {
         $json = $settings | ConvertTo-Json -Depth 10
         [System.IO.File]::WriteAllText($settingsPath, $json, [System.Text.UTF8Encoding]::new($false))
         Write-OK "Removed from settings: $($removed -join ', ')"
+    } else {
+        Write-Info "No properties to remove"
     }
 }
 
-# --- 3. 清理 Hooks ---
+# --- 3. Clean Hooks ---
+Write-Step "Cleaning Hooks..."
 $hooksDir = Join-Path $IFLOW_DIR "hooks"
 $hookFiles = @("git-context.ps1", "skills-inject.ps1", "cost-tracker.ps1", "compress-summary.ps1")
 
@@ -76,21 +83,24 @@ foreach ($file in $hookFiles) {
     }
 }
 
-# --- 4. 清理 Skills ---
+# --- 4. Clean Skills ---
+Write-Step "Cleaning Skills..."
 $skillsDir = Join-Path $IFLOW_DIR "skills"
 if ((Test-Path $skillsDir) -and (Get-ChildItem $skillsDir -ErrorAction SilentlyContinue).Count -eq 0) {
     Remove-Item $skillsDir -Force
     Write-OK "Removed empty skills directory"
 }
 
-# --- 5. 清理成本追踪 ---
+# --- 5. Clean cost tracking ---
+Write-Step "Cleaning cost tracking..."
 $costFile = Join-Path $IFLOW_DIR "cost_tracking.json"
 if (Test-Path $costFile) {
     Remove-Item $costFile -Force
     Write-OK "Removed cost_tracking.json"
 }
 
-# --- 6. 清理临时文件 ---
+# --- 6. Clean temp files ---
+Write-Step "Cleaning temp files..."
 $tmpDir = Join-Path $IFLOW_DIR "tmp"
 if (Test-Path $tmpDir) {
     Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -98,7 +108,7 @@ if (Test-Path $tmpDir) {
 }
 
 Write-Host ""
-Write-Host "======================================" -ForegroundColor Green
-Write-Host "  卸载完成!" -ForegroundColor Green
-Write-Host "======================================" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Green
+Write-Host "  Uninstall Complete!" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Green
 Write-Host ""

@@ -1,20 +1,23 @@
 ﻿<#
 .SYNOPSIS
-iflow.js countTokens 补丁脚本 - 使第三方API也能触发自动压缩
+iflow.js countTokens patch - Enable auto-compression for 3rd party APIs
 
 .DESCRIPTION
-修复 iflow CLI 中 gH 类的 countTokens 方法，使其在 extractTextFromRequest 
-返回空结果时也能正确估算 token 数量（基于 Gemini 格式的 contents 结构）。
+Fix the countTokens method in iflow CLI to correctly estimate token count
+when extractTextFromRequest returns empty (for Gemini-format contents).
 
-这是第三方 API（openai-compatible）不会自动压缩的根本原因：
-- gH.countTokens 依赖 extractTextFromRequest 提取文本
-- extractTextFromRequest 可能无法正确处理 Gemini 格式的 contents
-- 导致 totalTokens 为 0 或 undefined，压缩流程被跳过
+This is the root cause of third-party API (openai-compatible) not triggering
+auto-compression:
+- gH.countTokens depends on extractTextFromRequest to extract text
+- extractTextFromRequest may not handle Gemini-format contents correctly
+- Results in totalTokens being 0 or undefined, compression is skipped
 
-修复后：即使 extractTextFromRequest 返回空，也会遍历 contents 结构估算 token
+After fix: Even if extractTextFromRequest returns empty, the method will
+iterate through contents structure to estimate tokens.
 #>
 
 $ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 $iflowJs = "$env:APPDATA\npm\node_modules\@iflow-ai\iflow-cli\bundle\iflow.js"
 
