@@ -107,7 +107,8 @@ if (-not ($settings.PSObject.Properties.Name -contains "compressModel")) {
     $settings | Add-Member -NotePropertyName "compressModel" -NotePropertyValue $settings.modelName -Force
 }
 
-$settings | ConvertTo-Json | Set-Content $settingsPath -Encoding UTF8
+$json = $settings | ConvertTo-Json
+[System.IO.File]::WriteAllText($settingsPath, $json, [System.Text.UTF8Encoding]::new($false))
 Write-OK "settings.json updated"
 
 Write-Host ""

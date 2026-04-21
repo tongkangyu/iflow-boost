@@ -4,6 +4,7 @@ $settings | Add-Member -NotePropertyName "tokensLimit" -NotePropertyValue 256000
 $settings | Add-Member -NotePropertyName "outputTokensLimit" -NotePropertyValue 64000 -Force
 $settings | Add-Member -NotePropertyName "compressionTokenThreshold" -NotePropertyValue 0.8 -Force
 $settings | Add-Member -NotePropertyName "lightCompressionTokenThreshold" -NotePropertyValue 0.6 -Force
-$settings | ConvertTo-Json | Set-Content $settingsPath -Encoding UTF8
+$json = $settings | ConvertTo-Json
+[System.IO.File]::WriteAllText($settingsPath, $json, [System.Text.UTF8Encoding]::new($false))
 Write-Host "Settings updated successfully!"
 Get-Content $settingsPath

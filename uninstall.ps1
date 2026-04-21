@@ -63,7 +63,8 @@ if (Test-Path $settingsPath) {
     }
 
     if ($removed.Count -gt 0) {
-        $settings | ConvertTo-Json | Set-Content $settingsPath -Encoding UTF8
+        $json = $settings | ConvertTo-Json
+        [System.IO.File]::WriteAllText($settingsPath, $json, [System.Text.UTF8Encoding]::new($false))
         Write-OK "settings.json removed: $($removed -join ', ')"
     } else {
         Write-Warn "settings.json has no compression config to remove"
@@ -101,11 +102,11 @@ foreach ($proxyName in @("proxy.ps1", "proxy.py")) {
         Write-OK "Removed $proxyName from ~/.iflow/scripts/"
     }
 }
-    $scriptsDir = "$env:USERPROFILE\.iflow\scripts"
-    if ((Get-ChildItem $scriptsDir -ErrorAction SilentlyContinue).Count -eq 0) {
-        Remove-Item $scriptsDir -Force -ErrorAction SilentlyContinue
-        Write-OK "Removed empty scripts directory"
-    }
+
+$scriptsDir = "$env:USERPROFILE\.iflow\scripts"
+if ((Test-Path $scriptsDir) -and (Get-ChildItem $scriptsDir -ErrorAction SilentlyContinue).Count -eq 0) {
+    Remove-Item $scriptsDir -Force -ErrorAction SilentlyContinue
+    Write-OK "Removed empty scripts directory"
 }
 
 # --- 5. 清理 skills ---
