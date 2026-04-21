@@ -129,7 +129,7 @@ cd iflow-boost
 | mimo-v2-flash | 256000 |
 | deepseek-chat / deepseek-r1 | 128000 |
 | gpt-4o | 128000 |
-| claude-3.5-sonnet | 200000 |
+| claude-3.5-sonnet (Anthropic) | 200000 |
 | qwen-max | 128000 |
 
 ### 增强功能配置
