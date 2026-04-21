@@ -1,4 +1,4 @@
-﻿﻿﻿﻿<#
+﻿<#
 .SYNOPSIS
 Skills 注入 Hook
 

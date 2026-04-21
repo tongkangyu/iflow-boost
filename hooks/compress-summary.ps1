@@ -1,4 +1,4 @@
-﻿﻿<#
+﻿<#
 .SYNOPSIS
 结构化压缩摘要 Hook
 
@@ -9,60 +9,102 @@
 
 param()
 
-$ErrorActionPreference = "SilentlyContinue"
+$ErrorActionPreference = "Continue"
 
 $transcriptPath = $env:IFLOW_TRANSCRIPT_PATH
-if (-not $transcriptPath -or -not (Test-Path $transcriptPath)) {
+
+if (-not $transcriptPath) {
+    Write-Output "## Context Summary"
+    Write-Output ""
+    Write-Output "No transcript path available."
     exit 0
 }
 
-$transcript = Get-Content $transcriptPath -Raw -ErrorAction SilentlyContinue
-if (-not $transcript) { exit 0 }
-
-try {
-    $data = $transcript | ConvertFrom-Json
-} catch {
+if (-not (Test-Path $transcriptPath)) {
+    Write-Output "## Context Summary"
+    Write-Output ""
+    Write-Output "Transcript file not found: $transcriptPath"
     exit 0
 }
 
-$messages = $data.messages
-if (-not $messages) { exit 0 }
+# iflow 使用 JSONL 格式（每行一个 JSON 对象）
+$lines = Get-Content $transcriptPath -ErrorAction SilentlyContinue
+if (-not $lines -or $lines.Count -eq 0) {
+    Write-Output "## Context Summary"
+    Write-Output ""
+    Write-Output "Transcript file is empty."
+    exit 0
+}
+
+# 解析 JSONL 格式
+$messages = @()
+foreach ($line in $lines) {
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+    try {
+        $entry = $line | ConvertFrom-Json
+        if ($entry.type -eq "user" -or $entry.type -eq "assistant") {
+            $messages += $entry
+        }
+    } catch {}
+}
+
+if ($messages.Count -eq 0) {
+    Write-Output "## Context Summary"
+    Write-Output ""
+    Write-Output "No messages in transcript."
+    exit 0
+}
 
 $scope = @{
     total = $messages.Count
-    user = ($messages | Where-Object { $_.role -eq "user" }).Count
-    assistant = ($messages | Where-Object { $_.role -eq "assistant" }).Count
+    user = ($messages | Where-Object { $_.type -eq "user" }).Count
+    assistant = ($messages | Where-Object { $_.type -eq "assistant" }).Count
 }
 
 $toolsUsed = @{}
 $filesModified = @()
 $pendingTasks = @()
-$timeline = @()
 
 $pendingKeywords = @("todo", "next", "pending", "still need", "还需要", "待办", "接下来", "remaining", "follow up")
 
 foreach ($msg in $messages) {
-    $content = $msg.content
+    $content = $msg.message
     if (-not $content) { continue }
     
-    $text = if ($content -is [string]) { $content }
-             elseif ($content -is [array]) { $content | ForEach-Object { $_.text } }
-             else { $content.text }
+    # 提取文本内容
+    $text = ""
+    if ($content.content) {
+        if ($content.content -is [string]) {
+            $text = $content.content
+        } elseif ($content.content -is [array]) {
+            foreach ($part in $content.content) {
+                if ($part.text) {
+                    $text += $part.text + " "
+                } elseif ($part -is [string]) {
+                    $text += $part + " "
+                }
+            }
+        }
+    }
     
-    if (-not $text) { continue }
-    $text = $text -join " "
+    if ([string]::IsNullOrWhiteSpace($text)) { continue }
     
-    if ($msg.role -eq "assistant") {
-        $toolMatches = [regex]::Matches($text, "tool_use[`"`']?\s*:\s*[`"`']?(\w+)")
+    # 统计工具使用
+    if ($msg.type -eq "assistant") {
+        $toolMatches = [regex]::Matches($text, '"name"\s*:\s*"(\w+)"')
         foreach ($match in $toolMatches) {
             $tool = $match.Groups[1].Value
-            if ($tool) { $toolsUsed[$tool]++ }
+            if ($tool -and $tool -notmatch "^(response|message)$") {
+                $toolsUsed[$tool]++
+            }
         }
         
-        $fileMatches = [regex]::Matches($text, "[\w/\\-]+\.\w{1,10}")
+        # 提取文件名
+        $fileMatches = [regex]::Matches($text, '[\w/\\-]+\.\w{1,10}')
         foreach ($match in $fileMatches) {
             $file = $match.Value
-            if ($file -match "^(src|lib|test|docs|config|scripts)" -or $file -match "\.(ts|js|py|go|rs|java|cpp|c|h|md|json|yaml|yml)$") {
+            if ($file -match "^(src|lib|test|docs|config|scripts|hooks|skills)" -or 
+                $file -match "\.(ts|js|py|go|rs|java|cpp|c|h|md|json|yaml|yml|ps1)$") {
                 if ($filesModified -notcontains $file) {
                     $filesModified += $file
                 }
@@ -70,9 +112,10 @@ foreach ($msg in $messages) {
         }
     }
     
+    # 查找待办任务
     foreach ($keyword in $pendingKeywords) {
         if ($text -match [regex]::Escape($keyword)) {
-            $sentences = $text -split "[.!?。！？]"
+            $sentences = $text -split "[.!?。！？`n]"
             foreach ($sentence in $sentences) {
                 if ($sentence -match [regex]::Escape($keyword) -and $sentence.Length -gt 10 -and $sentence.Length -lt 200) {
                     $sentence = $sentence.Trim()
@@ -84,55 +127,38 @@ foreach ($msg in $messages) {
             break
         }
     }
-    
-    if ($msg.timestamp) {
-        try {
-            $ts = [DateTime]::Parse($msg.timestamp)
-            $timeline += $ts.ToString("HH:mm")
-        } catch {}
-    }
 }
 
-if ($timeline.Count -gt 5) {
-    $timeline = $timeline | Select-Object -First 1, -Last 1
-}
-
-$output = @()
-$output += "## Context Summary"
-$output += ""
-$output += "### Scope"
-$output += "- Total messages: $($scope.total)"
-$output += "- User: $($scope.user), Assistant: $($scope.assistant)"
-$output += ""
+$output = [System.Collections.ArrayList]@()
+[void]$output.Add("## Context Summary")
+[void]$output.Add("")
+[void]$output.Add("### Scope")
+[void]$output.Add("- Total messages: $($scope.total)")
+[void]$output.Add("- User: $($scope.user), Assistant: $($scope.assistant)")
+[void]$output.Add("")
 
 if ($toolsUsed.Count -gt 0) {
-    $output += "### Tools Used"
+    [void]$output.Add("### Tools Used")
     $toolsUsed.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 5 | ForEach-Object {
-        $output += "- $($_.Key): $($_.Value) times"
+        [void]$output.Add("- $($_.Key): $($_.Value) times")
     }
-    $output += ""
+    [void]$output.Add("")
 }
 
 if ($filesModified.Count -gt 0) {
-    $output += "### Files Referenced"
+    [void]$output.Add("### Files Referenced")
     $filesModified | Select-Object -First 10 | ForEach-Object {
-        $output += "- $_"
+        [void]$output.Add("- $_")
     }
-    $output += ""
+    [void]$output.Add("")
 }
 
 if ($pendingTasks.Count -gt 0) {
-    $output += "### Pending Tasks"
+    [void]$output.Add("### Pending Tasks")
     $pendingTasks | Select-Object -First 5 | ForEach-Object {
-        $output += "- $_"
+        [void]$output.Add("- $_")
     }
-    $output += ""
+    [void]$output.Add("")
 }
 
-if ($timeline.Count -gt 0) {
-    $output += "### Timeline"
-    $output += "- Session: $($timeline -join ' -> ')"
-    $output += ""
-}
-
-$output -join "`n"
+Write-Output ($output -join "`n")

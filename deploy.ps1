@@ -1,4 +1,4 @@
-# iflow-boost deploy script - No proxy version
+﻿# iflow-boost deploy script - No proxy version
 # Apply countTokens patch, deploy Hooks and Skills, configure settings.json
 
 param(

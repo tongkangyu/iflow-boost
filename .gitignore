@@ -6,5 +6,10 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# 临时文件（PID 命名的 hook 输入文件等）
-/^[0-9]+$/
+# IDE
+.vscode/
+.idea/
+
+# Temp files
+*.tmp
+*.temp
