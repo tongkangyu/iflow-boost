@@ -302,7 +302,17 @@ if ($patchCount -gt 0) {
         Write-Host "[..] Original backup already exists, preserving it" -ForegroundColor Cyan
     }
 
-    [System.IO.File]::WriteAllText($iflowJs, $content)
+    try {
+        [System.IO.File]::WriteAllText($iflowJs, $content)
+        # Read back and verify the file was written correctly
+        $verifyContent = [System.IO.File]::ReadAllText($iflowJs)
+        if ($verifyContent.Length -ne $content.Length) {
+            throw "Write verification failed: length mismatch ($($verifyContent.Length) vs $($content.Length))"
+        }
+    } catch {
+        Write-Host "[ERROR] Failed to write patched iflow.js: $_" -ForegroundColor Red
+        exit 1
+    }
 
     # Save version marker
     $versionDir = Split-Path $VERSION_FILE -Parent

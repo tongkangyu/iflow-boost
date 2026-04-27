@@ -15,8 +15,8 @@ if (-not (Test-Path $skillsDir)) { exit 0 }
 $allSkills = @()
 Get-ChildItem $skillsDir -Filter "*.json" | ForEach-Object {
     try {
-        $skill = Get-Content $_.FullName -Raw | ConvertFrom-Json
-        if ($skill.name -and $skill.trigger -and $skill.instructions) {
+        $skill = Get-Content $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($skill.name -and $skill.trigger_keywords -and $skill.instructions) {
             $allSkills += $skill
         }
     } catch {}
@@ -35,7 +35,7 @@ foreach ($skill in $allSkills) {
     if ($skill.description) {
         $output += "$($skill.description)"
     }
-    $output += "**Trigger:** $($skill.trigger -join ', ')"
+    $output += "**Trigger:** $($skill.trigger_keywords -join ', ')"
     $output += ""
 }
 

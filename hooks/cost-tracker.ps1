@@ -8,16 +8,8 @@
 
 $ErrorActionPreference = "SilentlyContinue"
 
-$toolName = $env:IFLOW_TOOL_NAME
 $toolArgs = $env:IFLOW_TOOL_ARGS
-
 if (-not $toolArgs) { exit 0 }
-
-try {
-    $args = $toolArgs | ConvertFrom-Json
-} catch {
-    exit 0
-}
 
 $costFile = Join-Path $env:USERPROFILE ".iflow\cost_tracking.json"
 $today = Get-Date -Format "yyyy-MM-dd"

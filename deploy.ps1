@@ -148,9 +148,9 @@ $settingsPath = Join-Path $IFLOW_DIR "settings.json"
 
 if ($hasHooksPermission) {
     if (Test-Path $settingsPath) {
-        $settings = Get-Content $settingsPath -Raw | ConvertFrom-Json
+        $settings = Get-Content $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
     } else {
-        $settings = @{}
+        $settings = [PSCustomObject]@{}
     }
 
     # tokensLimit: auto-detected by patch-iflow.ps1 based on model name.

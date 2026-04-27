@@ -59,7 +59,7 @@ Write-Step "Cleaning settings.json..."
 $settingsPath = Join-Path $IFLOW_DIR "settings.json"
 
 if (Test-Path $settingsPath) {
-    $settings = Get-Content $settingsPath -Raw | ConvertFrom-Json
+    $settings = Get-Content $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
     
     $propsToRemove = @(
         "tokensLimit",

@@ -28,24 +28,27 @@ if (-not (Test-Path $transcriptPath)) {
 }
 
 # iflow 使用 JSONL 格式（每行一个 JSON 对象）
-$lines = Get-Content $transcriptPath -ErrorAction SilentlyContinue
-if (-not $lines -or $lines.Count -eq 0) {
+# 使用 StreamReader 逐行读取，避免大文件全量加载到内存
+$messages = [System.Collections.Generic.List[object]]::new()
+$reader = $null
+try {
+    $reader = [System.IO.StreamReader]::new($transcriptPath, [System.Text.UTF8Encoding]::new($false))
+    while (($line = $reader.ReadLine()) -ne $null) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        try {
+            $entry = $line | ConvertFrom-Json
+            if ($entry.type -eq "user" -or $entry.type -eq "assistant") {
+                $messages.Add($entry)
+            }
+        } catch {}
+    }
+} catch {
     Write-Output "## Context Summary"
     Write-Output ""
     Write-Output "Transcript file is empty."
     exit 0
-}
-
-# 解析 JSONL 格式
-$messages = @()
-foreach ($line in $lines) {
-    if ([string]::IsNullOrWhiteSpace($line)) { continue }
-    try {
-        $entry = $line | ConvertFrom-Json
-        if ($entry.type -eq "user" -or $entry.type -eq "assistant") {
-            $messages += $entry
-        }
-    } catch {}
+} finally {
+    if ($reader) { $reader.Dispose() }
 }
 
 if ($messages.Count -eq 0) {
@@ -129,36 +132,36 @@ foreach ($msg in $messages) {
     }
 }
 
-$output = [System.Collections.ArrayList]@()
-[void]$output.Add("## Context Summary")
-[void]$output.Add("")
-[void]$output.Add("### Scope")
-[void]$output.Add("- Total messages: $($scope.total)")
-[void]$output.Add("- User: $($scope.user), Assistant: $($scope.assistant)")
-[void]$output.Add("")
+$output = [System.Collections.Generic.List[string]]::new()
+$output.Add("## Context Summary")
+$output.Add("")
+$output.Add("### Scope")
+$output.Add("- Total messages: $($scope.total)")
+$output.Add("- User: $($scope.user), Assistant: $($scope.assistant)")
+$output.Add("")
 
 if ($toolsUsed.Count -gt 0) {
-    [void]$output.Add("### Tools Used")
+    $output.Add("### Tools Used")
     $toolsUsed.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 5 | ForEach-Object {
-        [void]$output.Add("- $($_.Key): $($_.Value) times")
+        $output.Add("- $($_.Key): $($_.Value) times")
     }
-    [void]$output.Add("")
+    $output.Add("")
 }
 
 if ($filesModified.Count -gt 0) {
-    [void]$output.Add("### Files Referenced")
+    $output.Add("### Files Referenced")
     $filesModified | Select-Object -First 10 | ForEach-Object {
-        [void]$output.Add("- $_")
+        $output.Add("- $_")
     }
-    [void]$output.Add("")
+    $output.Add("")
 }
 
 if ($pendingTasks.Count -gt 0) {
-    [void]$output.Add("### Pending Tasks")
+    $output.Add("### Pending Tasks")
     $pendingTasks | Select-Object -First 5 | ForEach-Object {
-        [void]$output.Add("- $_")
+        $output.Add("- $_")
     }
-    [void]$output.Add("")
+    $output.Add("")
 }
 
 Write-Output ($output -join "`n")
