@@ -1,8 +1,9 @@
-﻿# iflow-boost deploy script - No proxy version
+# iflow-boost deploy script - No proxy version
 # Apply countTokens patch, deploy Hooks and Skills, configure settings.json
 
 param(
-    [switch]$SkipPatch
+    [switch]$SkipPatch,
+    [int]$TokensLimit = 0
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,6 +13,7 @@ $IFLOW_DIR = Join-Path $env:USERPROFILE ".iflow"
 $HOOKS_DIR = Join-Path $IFLOW_DIR "hooks"
 $SKILLS_DIR = Join-Path $IFLOW_DIR "skills"
 $IFLOW_JS = "$env:APPDATA\npm\node_modules\@iflow-ai\iflow-cli\bundle\iflow.js"
+$BACKUP_DIR = Join-Path $IFLOW_DIR ".deploy-backup"
 
 function Write-OK { Write-Host "[OK] $args" -ForegroundColor Green }
 function Write-Info { Write-Host "[..] $args" -ForegroundColor Cyan }
@@ -39,6 +41,42 @@ Write-Host ""
 $hasIflowPermission = Test-WritePermission (Split-Path $IFLOW_JS -Parent)
 $hasHooksPermission = Test-WritePermission $IFLOW_DIR
 $manualSteps = @()
+
+# --- Create backup of existing hooks/settings before overwriting ---
+Write-Step "Backing up current configuration..."
+if ($hasHooksPermission) {
+    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $backupTimestamped = Join-Path $BACKUP_DIR "pre-deploy-$timestamp"
+
+    $hasAnythingToBackup = $false
+    if (Test-Path $HOOKS_DIR) {
+        $hookCount = (Get-ChildItem $HOOKS_DIR -Filter "*.ps1" -ErrorAction SilentlyContinue).Count
+        if ($hookCount -gt 0) {
+            if (-not (Test-Path $backupTimestamped)) {
+                New-Item -ItemType Directory -Force -Path $backupTimestamped | Out-Null
+            }
+            Copy-Item "$HOOKS_DIR\*.ps1" $backupTimestamped -Force -ErrorAction SilentlyContinue
+            Write-OK "Backed up $hookCount hook(s) to $backupTimestamped"
+            $hasAnythingToBackup = $true
+        }
+    }
+
+    $settingsPath = Join-Path $IFLOW_DIR "settings.json"
+    if (Test-Path $settingsPath) {
+        if (-not (Test-Path $backupTimestamped)) {
+            New-Item -ItemType Directory -Force -Path $backupTimestamped | Out-Null
+        }
+        Copy-Item $settingsPath $backupTimestamped -Force
+        Write-OK "Backed up settings.json to $backupTimestamped"
+        $hasAnythingToBackup = $true
+    }
+
+    if (-not $hasAnythingToBackup) {
+        Write-Info "Nothing to backup (fresh install)"
+    }
+} else {
+    Write-Warn "No permission to create backups"
+}
 
 # Step 1: Apply patch
 if (-not $SkipPatch) {
@@ -115,7 +153,14 @@ if ($hasHooksPermission) {
         $settings = @{}
     }
 
-    $settings | Add-Member -NotePropertyName "tokensLimit" -NotePropertyValue 256000 -Force
+    # tokensLimit: auto-detected by patch-iflow.ps1 based on model name.
+    # Manual override via -TokensLimit parameter takes priority.
+    if ($TokensLimit -gt 0) {
+        $settings | Add-Member -NotePropertyName "tokensLimit" -NotePropertyValue $TokensLimit -Force
+    } elseif (-not ($settings.PSObject.Properties.Name -contains "tokensLimit")) {
+        # Set a safe placeholder; patch-iflow.ps1 will auto-correct it
+        $settings | Add-Member -NotePropertyName "tokensLimit" -NotePropertyValue 128000 -Force
+    }
     $settings | Add-Member -NotePropertyName "compressionTokenThreshold" -NotePropertyValue 0.8 -Force
     $settings | Add-Member -NotePropertyName "contextFileName" -NotePropertyValue @("IFLOW.md", "CLAUDE.md") -Force
 
@@ -123,8 +168,8 @@ if ($hasHooksPermission) {
         "SetUpEnvironment" = @(
             @{
                 hooks = @(
-                    @{ type = "command"; command = "powershell -ExecutionPolicy Bypass -File `"$HOOKS_DIR\git-context.ps1`""; timeout = 5 },
-                    @{ type = "command"; command = "powershell -ExecutionPolicy Bypass -File `"$HOOKS_DIR\skills-inject.ps1`""; timeout = 5 }
+                    @{ type = "command"; command = "powershell -ExecutionPolicy Bypass -File \`"$HOOKS_DIR\git-context.ps1\`""; timeout = 5 },
+                    @{ type = "command"; command = "powershell -ExecutionPolicy Bypass -File \`"$HOOKS_DIR\skills-inject.ps1\`""; timeout = 5 }
                 )
             }
         )
@@ -132,7 +177,7 @@ if ($hasHooksPermission) {
             @{
                 matcher = "compress"
                 hooks = @(
-                    @{ type = "command"; command = "powershell -ExecutionPolicy Bypass -File `"$HOOKS_DIR\compress-summary.ps1`""; timeout = 10 }
+                    @{ type = "command"; command = "powershell -ExecutionPolicy Bypass -File \`"$HOOKS_DIR\compress-summary.ps1\`""; timeout = 10 }
                 )
             }
         )
@@ -140,7 +185,7 @@ if ($hasHooksPermission) {
             @{
                 matcher = "*"
                 hooks = @(
-                    @{ type = "command"; command = "powershell -ExecutionPolicy Bypass -File `"$HOOKS_DIR\cost-tracker.ps1`""; timeout = 5 }
+                    @{ type = "command"; command = "powershell -ExecutionPolicy Bypass -File \`"$HOOKS_DIR\cost-tracker.ps1\`""; timeout = 5 }
                 )
             }
         )
@@ -203,5 +248,19 @@ Write-Host "  - Skills system" -ForegroundColor White
 Write-Host "  - Structured compression summary" -ForegroundColor White
 Write-Host "  - Cost tracking" -ForegroundColor White
 Write-Host ""
+Write-Host "  - Model auto-detection: tokensLimit matched to your model" -ForegroundColor White
+Write-Host "  - Manual override: .\deploy.ps1 -TokensLimit <value>" -ForegroundColor Gray
+Write-Host ""
+
+# Print backup info
+$backups = Get-ChildItem $BACKUP_DIR -ErrorAction SilentlyContinue | Sort-Object Name
+if ($backups) {
+    Write-Host "Configuration backups:" -ForegroundColor Cyan
+    foreach ($b in $backups) {
+        Write-Host "  - $($b.Name)" -ForegroundColor Gray
+    }
+    Write-Host ""
+}
+
 Write-Host "Now run: iflow" -ForegroundColor Yellow
 Write-Host ""

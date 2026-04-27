@@ -1,11 +1,12 @@
-﻿<#
+<#
 .SYNOPSIS
 Uninstall iflow-boost and restore iflow to original state
 
 .DESCRIPTION
-1. Restore countTokens method in iflow.js
-2. Remove configuration from settings.json
-3. Clean up Hooks and Skills files
+1. Restore countTokens method in iflow.js from protected backup
+2. Remove patch version tracking
+3. Remove configuration from settings.json
+4. Clean up Hooks and Skills files
 #>
 
 $ErrorActionPreference = "Stop"
@@ -27,17 +28,33 @@ Write-Host ""
 # --- 1. Restore iflow.js ---
 Write-Step "Restoring iflow.js..."
 $iflowJs = "$env:APPDATA\npm\node_modules\@iflow-ai\iflow-cli\bundle\iflow.js"
-$backup = $iflowJs + ".bak"
+$originalBackup = $iflowJs + ".bak.original"
+$legacyBackup = $iflowJs + ".bak"
 
-if (Test-Path $backup) {
-    Copy-Item $backup $iflowJs -Force
-    Remove-Item $backup -Force
-    Write-OK "Restored iflow.js from backup"
+if (Test-Path $originalBackup) {
+    Copy-Item $originalBackup $iflowJs -Force
+    Remove-Item $originalBackup -Force
+    Write-OK "Restored iflow.js from original backup"
+} elseif (Test-Path $legacyBackup) {
+    # Fallback: legacy single backup (from pre-v2 patch)
+    Copy-Item $legacyBackup $iflowJs -Force
+    Remove-Item $legacyBackup -Force
+    Write-Warn "Restored from legacy backup (may not be original if patch was re-applied)"
 } else {
     Write-Warn "No backup found, iflow.js not restored"
 }
 
-# --- 2. Clean settings.json ---
+# --- 2. Remove version file ---
+Write-Step "Removing patch version tracking..."
+$versionFile = Join-Path $IFLOW_DIR ".patch-version"
+if (Test-Path $versionFile) {
+    Remove-Item $versionFile -Force
+    Write-OK "Removed .patch-version"
+} else {
+    Write-Info "No version file found"
+}
+
+# --- 3. Clean settings.json ---
 Write-Step "Cleaning settings.json..."
 $settingsPath = Join-Path $IFLOW_DIR "settings.json"
 
@@ -70,7 +87,7 @@ if (Test-Path $settingsPath) {
     }
 }
 
-# --- 3. Clean Hooks ---
+# --- 4. Clean Hooks ---
 Write-Step "Cleaning Hooks..."
 $hooksDir = Join-Path $IFLOW_DIR "hooks"
 $hookFiles = @("git-context.ps1", "skills-inject.ps1", "cost-tracker.ps1", "compress-summary.ps1")
@@ -83,7 +100,7 @@ foreach ($file in $hookFiles) {
     }
 }
 
-# --- 4. Clean Skills ---
+# --- 5. Clean Skills ---
 Write-Step "Cleaning Skills..."
 $skillsDir = Join-Path $IFLOW_DIR "skills"
 if ((Test-Path $skillsDir) -and (Get-ChildItem $skillsDir -ErrorAction SilentlyContinue).Count -eq 0) {
@@ -91,7 +108,7 @@ if ((Test-Path $skillsDir) -and (Get-ChildItem $skillsDir -ErrorAction SilentlyC
     Write-OK "Removed empty skills directory"
 }
 
-# --- 5. Clean cost tracking ---
+# --- 6. Clean cost tracking ---
 Write-Step "Cleaning cost tracking..."
 $costFile = Join-Path $IFLOW_DIR "cost_tracking.json"
 if (Test-Path $costFile) {
@@ -99,7 +116,7 @@ if (Test-Path $costFile) {
     Write-OK "Removed cost_tracking.json"
 }
 
-# --- 6. Clean temp files ---
+# --- 7. Clean temp files ---
 Write-Step "Cleaning temp files..."
 $tmpDir = Join-Path $IFLOW_DIR "tmp"
 if (Test-Path $tmpDir) {

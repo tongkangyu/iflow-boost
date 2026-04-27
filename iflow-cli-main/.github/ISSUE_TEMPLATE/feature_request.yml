@@ -1,0 +1,37 @@
+name: Feature Request
+description: Suggest an idea for this project
+labels: ['kind/enhancement', 'status/need-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!CAUTION]
+        > iFlow CLI is shutting down on April 17, 2026 (UTC+8). No new features or bug fixes will be released.
+        > See our [farewell post](https://vibex.iflow.cn/t/topic/4819) for details.
+
+        > [!IMPORTANT]
+        > Thanks for taking the time to suggest an enhancement!
+        >
+        > Please search **[existing issues](https://github.com/iflow-ai/iflow-cli/issues)** to see if a similar feature has already been requested.
+
+  - type: textarea
+    id: feature
+    attributes:
+      label: What would you like to be added?
+      description: A clear and concise description of the enhancement.
+    validations:
+      required: true
+
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Why is this needed?
+      description: A clear and concise description of why this enhancement is needed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add any other context or screenshots about the feature request here.
